@@ -19,6 +19,27 @@
             color: #333;
         }
         .container { max-width: 1400px; margin: 0 auto; }
+
+        /* Back Button Style (ab yeh properly kaam karega) */
+        .back-btn {
+            display: inline-block;
+            margin: 0 0 25px 0;
+            padding: 12px 24px;
+            background: #6c757d;
+            color: white;
+            text-decoration: none;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 1.1em;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .back-btn:hover {
+            background: #5a6268;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        }
+
         .header { text-align: center; color: white; margin-bottom: 30px; }
         .header h1 { font-size: 2.6em; margin-bottom: 8px; text-shadow: 2px 2px 6px rgba(0,0,0,0.4); }
         .stats-container {
@@ -137,7 +158,8 @@
 <body>
 
 <div class="container">
-    <a href="index.html" class="back-btn" style="margin-bottom:20px;">← Back to Dashboard</a>
+    <!-- Back Button (ab style sahi se kaam karega) -->
+    <a href="index.html" class="back-btn">← Back to Dashboard</a>
 
     <div class="header">
         <h1>🏭 Factory Material Management</h1>
@@ -248,7 +270,7 @@
 </div>
 
 <script>
-// Firebase Config (tumhara config)
+// Firebase Config
 const firebaseConfig = {
   apiKey: "AIzaSyC5Ynr5W3CczK1guxwESYaFr7wCmWvSpHY",
   authDomain: "mehtabfactoryapp.firebaseapp.com",
@@ -346,7 +368,6 @@ function addMaterial() {
         .then(() => {
             clearForm();
             alert("Entry saved to cloud!");
-            // No manual push needed - onSnapshot auto update karega
         })
         .catch((error) => {
             alert("Error saving: " + error.message);
