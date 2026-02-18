@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crushing Stage - Factory Management</title>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body { font-family: 'Segoe UI',sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; color: #333; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .back-btn { display: inline-block; margin-bottom: 20px; padding: 12px 24px; background: #6c757d; color: white; text-decoration: none; border-radius: 10px; font-weight: 600; }
+        .back-btn:hover { background: #5a6268; }
+        .header { text-align: center; color: white; margin-bottom: 30px; }
+        .header h1 { font-size: 2.4em; text-shadow: 2px 2px 6px rgba(0,0,0,0.4); }
+        .entry-box, .table-container { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 8px 16px rgba(0,0,0,0.2); margin-bottom: 30px; }
+        h2 { color: #2c3e50; border-bottom: 3px solid #667eea; padding-bottom: 10px; margin-bottom: 20px; }
+        .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px; }
+        .form-group { display: flex; flex-direction: column; }
+        .form-group label { margin-bottom: 8px; font-weight: 600; color: #444; }
+        .form-group input, .form-group select { padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 1em; }
+        .form-group input:focus, .form-group select:focus { border-color: #667eea; box-shadow: 0 0 0 3px rgba(102,126,234,0.15); outline: none; }
+        .button-group { display: flex; gap: 12px; margin-top: 20px; }
+        button { padding: 12px 24px; border: none; border-radius: 8px; font-weight: 600; cursor: pointer; }
+        .btn-add { background: #667eea; color: white; flex: 1; }
+        .btn-add:hover { background: #5a6fd1; }
+        .btn-clear { background: #e9ecef; color: #495057; }
+        .btn-clear:hover { background: #dee2e6; }
+        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+        thead { background: #667eea; color: white; }
+        th, td { padding: 14px; text-align: left; border-bottom: 1px solid #eee; }
+        tr:hover { background: #f8f9ff; }
+        .btn-delete { background: #dc3545; color: white; border: none; padding: 8px 14px; border-radius: 6px; cursor: pointer; }
+        .btn-delete:hover { background: #c82333; }
+        .empty-state { text-align: center; padding: 40px; color: #999; }
+    </style>
+</head>
+<body>
+
+<a href="index.html" class="back-btn">← Back to Dashboard</a>
+
+<div class="container">
+    <div class="header">
+        <h1>🔨 Crushing Stage</h1>
+        <p>Crush material into flakes (no significant waste here)</p>
+    </div>
+
+    <div class="entry-box">
+        <h2>📝 New Crushing Entry</h2>
+        <div class="form-grid">
+            <div class="form-group">
+                <label for="date">Date</label>
+                <input type="date" id="date" required>
+            </div>
+            <div class="form-group">
+                <label for="qualityName">Quality / Color Name</label>
+                <input type="text" id="qualityName" placeholder="e.g. White, Blue HDPE, Mix" required>
+            </div>
+            <div class="form-group">
+                <label for="inputKg">Input Material (KG)</label>
+                <input type="number" id="inputKg" min="0" step="0.01" required placeholder="0.00">
+            </div>
+            <div class="form-group">
+                <label for="outputKg">Crushed Flakes Output (KG)</label>
+                <input type="number" id="outputKg" min="0" step="0.01" required placeholder="0.00">
+                <small style="color:#555; margin-top:5px; display:block;">Usually same as input (no waste in crushing)</small>
+            </div>
+            <div class="form-group">
+                <label for="labor">Labour / Machine Name (optional)</label>
+                <input type="text" id="labor" placeholder="Name">
+            </div>
+        </div>
+        <div class="button-group">
+            <button class="btn-add" onclick="addCrushing()">➕ Add Crushing</button>
+            <button class="btn-clear" onclick="clearForm()">🔄 Clear</button>
+        </div>
+    </div>
+
+    <div class="table-container">
+        <h2>📊 Crushing Records</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Date</th>
+                    <th>Quality / Color</th>
+                    <th>Input KG</th>
+                    <th>Output Flakes KG</th>
+                    <th>Labour/Machine</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="crushingTable"></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+// Firebase Config
+const firebaseConfig = {
+  apiKey: "AIzaSyC5Ynr5W3CczK1guxwESYaFr7wCmWvSpHY",
+  authDomain: "mehtabfactoryapp.firebaseapp.com",
+  projectId: "mehtabfactoryapp",
+  storageBucket: "mehtabfactoryapp.firebasestorage.app",
+  messagingSenderId: "4179937270",
+  appId: "1:4179937270:web:63332de20e08959b5de9d7",
+  measurementId: "G-REP7Y256R7"
+};
+
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// Real-time data from Firestore
+let crushingRecords = [];
+
+db.collection("crushingRecords")
+  .orderBy("timestamp", "desc")
+  .onSnapshot((snapshot) => {
+    crushingRecords = [];
+    snapshot.forEach((doc) => {
+      crushingRecords.push({ id: doc.id, ...doc.data() });
+    });
+    showTable();
+  }, (error) => {
+    console.error("Firestore error:", error);
+    alert("Error loading crushing data from cloud.");
+  });
+
+// Add entry to Firestore
+function addCrushing() {
+    const date = document.getElementById("date").value;
+    const quality = document.getElementById("qualityName").value.trim();
+    const inputKg = parseFloat(document.getElementById("inputKg").value);
+    const outputKg = parseFloat(document.getElementById("outputKg").value);
+    const labor = document.getElementById("labor").value.trim();
+
+    if (!date || !quality || isNaN(inputKg) || inputKg <= 0 || isNaN(outputKg) || outputKg <= 0) {
+        alert("Please fill all required fields with valid positive values!");
+        return;
+    }
+
+    if (outputKg > inputKg) {
+        alert("Output flakes cannot be more than input material!");
+        return;
+    }
+
+    const obj = {
+        date,
+        quality,
+        inputKg,
+        outputKg,
+        labor: labor || "-",
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    db.collection("crushingRecords").add(obj)
+        .then(() => {
+            clearForm();
+            alert("Crushing entry saved to cloud!");
+        })
+        .catch((error) => {
+            alert("Error saving: " + error.message);
+            console.error(error);
+        });
+}
+
+function clearForm() {
+    document.getElementById("date").valueAsDate = new Date();
+    document.getElementById("qualityName").value = "";
+    document.getElementById("inputKg").value = "";
+    document.getElementById("outputKg").value = "";
+    document.getElementById("labor").value = "";
+}
+
+function deleteEntry(id) {
+    if (!confirm("Delete this crushing entry?")) return;
+    
+    db.collection("crushingRecords").doc(id).delete()
+        .then(() => {
+            // onSnapshot auto refresh karega
+        })
+        .catch((error) => {
+            alert("Error deleting: " + error.message);
+        });
+}
+
+function showTable() {
+    const tbody = document.getElementById("crushingTable");
+    tbody.innerHTML = "";
+
+    if (crushingRecords.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="empty-state"><h3>No crushing records yet</h3></td></tr>`;
+        return;
+    }
+
+    crushingRecords.forEach((r, i) => {
+        tbody.innerHTML += `
+            <tr>
+                <td>${i+1}</td>
+                <td>${r.date}</td>
+                <td><strong>${r.quality}</strong></td>
+                <td>${r.inputKg.toFixed(2)}</td>
+                <td>${r.outputKg.toFixed(2)}</td>
+                <td>${r.labor}</td>
+                <td><button class="btn-delete" onclick="deleteEntry('${r.id}')">Delete</button></td>
+            </tr>`;
+    });
+}
+
+// Auto fill output = input (since waste nahi hota)
+document.getElementById("inputKg").addEventListener('input', function() {
+    document.getElementById("outputKg").value = this.value;
+});
+
+document.getElementById("outputKg").addEventListener('input', function() {
+    if (parseFloat(this.value) > parseFloat(document.getElementById("inputKg").value)) {
+        this.value = document.getElementById("inputKg").value;
+    }
+});
+
+// Init
+document.getElementById("date").valueAsDate = new Date();
+showTable();
+
+</script>
+</body>
+</html>

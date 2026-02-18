@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+    <title>Party Ledger Management</title>
+    <style>
+        * { margin:0; padding:0; box-sizing:border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+            color: #333;
+        }
+        .container { max-width: 1400px; margin: 0 auto; }
+        .header { text-align: center; color: white; margin-bottom: 30px; }
+        .header h1 { font-size: 2.6em; margin-bottom: 8px; text-shadow: 2px 2px 6px rgba(0,0,0,0.4); }
+        
+        .back-btn {
+            display: inline-block;
+            margin-bottom: 20px;
+            padding: 10px 20px;
+            background: #6c757d;
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+        .back-btn:hover { background: #5a6268; }
+
+        .main-grid {
+            display: grid;
+            grid-template-columns: 1fr 2fr;
+            gap: 25px;
+        }
+
+        .stats-section { display: flex; flex-direction: column; gap: 15px; }
+        .stat-card {
+            background: white;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+            text-align: center;
+        }
+        .stat-card h3 { color: #555; font-size: 0.95em; margin-bottom: 8px; text-transform: uppercase; }
+        .stat-card .value { font-size: 2.1em; font-weight: bold; }
+        .positive { color: #28a745; }
+        .negative { color: #dc3545; }
+        .neutral  { color: #667eea; }
+
+        .entry-box {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+            margin-top: 20px;
+        }
+        .entry-box h2 { margin-bottom: 24px; color: #2c3e50; border-bottom: 4px solid #667eea; padding-bottom: 12px; }
+
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; color: #444; font-weight: 600; }
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 1em;
+        }
+        .form-group input:focus, .form-group select:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102,126,234,0.15);
+            outline: none;
+        }
+
+        .type-selector {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin: 12px 0 20px;
+        }
+        .type-option {
+            padding: 16px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.25s;
+        }
+        .type-option.active { border-color: #667eea; background: #f0f4ff; font-weight: 600; }
+
+        .type-option.give.active    { border-color: #28a745; background: #e8f5e9; }
+        .type-option.receive.active { border-color: #dc3545; background: #fce8e6; }
+
+        .button-group { display: flex; gap: 12px; }
+        button {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.25s;
+        }
+        .btn-add    { background: linear-gradient(135deg, #667eea, #764ba2); color: white; flex: 1; }
+        .btn-clear  { background: #e9ecef; color: #495057; }
+        .btn-add:hover    { transform: translateY(-2px); box-shadow: 0 6px 12px rgba(102,126,234,0.3); }
+        .btn-clear:hover  { background: #dee2e6; }
+
+        .tables-section {
+            background: white;
+            padding: 28px;
+            border-radius: 15px;
+            box-shadow: 0 8px 16px rgba(0,0,0,0.15);
+        }
+
+        .table-tabs {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e9ecef;
+        }
+        .tab {
+            padding: 12px 24px;
+            background: none;
+            border: none;
+            border-bottom: 3px solid transparent;
+            cursor: pointer;
+            font-weight: 600;
+            color: #6c757d;
+        }
+        .tab.active { color: #667eea; border-bottom-color: #667eea; }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .search-bar {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .search-bar input {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            min-width: 220px;
+        }
+
+        table { width: 100%; border-collapse: collapse; }
+        thead { background: linear-gradient(135deg, #667eea, #764ba2); color: white; }
+        th, td { padding: 14px 12px; text-align: left; border-bottom: 1px solid #eee; }
+        th { font-weight: 600; text-transform: uppercase; font-size: 0.9em; }
+        tr:hover { background: #f8f9ff; }
+
+        .amount-give    { color: #28a745; font-weight: 600; }
+        .amount-receive { color: #dc3545; font-weight: 600; }
+        .balance-pos { color: #28a745; font-weight: bold; }
+        .balance-neg { color: #dc3545; font-weight: bold; }
+        .balance-zero { color: #6c757d; }
+
+        .btn-delete {
+            background: #dc3545;
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+        .btn-delete:hover { background: #c82333; }
+
+        .btn-export {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+        }
+        .btn-export:hover { background: #218838; }
+
+        .empty-state { text-align: center; padding: 50px 20px; color: #999; }
+        .empty-state h3 { margin: 15px 0 8px; }
+
+        .party-summary-card {
+            background: #f8f9ff;
+            padding: 16px;
+            border-radius: 10px;
+            margin-bottom: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.2s;
+        }
+        .party-summary-card:hover { background: #e9f0ff; transform: translateX(4px); }
+
+        .highlight { animation: highlight 1s ease; }
+        @keyframes highlight { 0% { background: #fff3cd; } 100% { background: transparent; } }
+
+        @media (max-width: 1024px) { .main-grid { grid-template-columns: 1fr; } }
+        @media (max-width: 768px) {
+            th, td { padding: 10px; font-size: 0.9em; }
+            .type-selector { grid-template-columns: 1fr; }
+        }
+
+        @media print {
+            body { background: white; padding: 0; }
+            .container { max-width: none; }
+            .header, .back-btn, .entry-box, .table-tabs, .search-bar, .btn-delete, .btn-export { display: none; }
+            .tables-section { box-shadow: none; padding: 0; }
+            table { page-break-inside: avoid; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>💼 Party Ledger Management</h1>
+        <p>Track payments to and from suppliers / customers</p>
+    </div>
+
+    <a href="index.html" class="back-btn">← Back to Dashboard</a>
+
+    <div class="main-grid">
+        <!-- Left: Stats + Form -->
+        <div>
+            <div class="stats-section">
+                <div class="stat-card">
+                    <h3>Net Balance</h3>
+                    <div class="value neutral" id="netBalance">Rs 0</div>
+                    <div id="balanceStatus">All settled</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Receivable</h3>
+                    <div class="value positive" id="totalReceivable">Rs 0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Payable</h3>
+                    <div class="value negative" id="totalPayable">Rs 0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Total Parties</h3>
+                    <div class="value neutral" id="totalParties">0</div>
+                </div>
+            </div>
+
+            <div class="entry-box">
+                <h2>📝 New Transaction</h2>
+                <form id="partyForm">
+                    <div class="form-group">
+                        <label for="date">Date</label>
+                        <input type="date" id="date" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="partyName">Party Name</label>
+                        <input type="text" id="partyName" placeholder="Enter party name" list="partyList" required autocomplete="off">
+                        <datalist id="partyList"></datalist>
+                    </div>
+                    <div class="form-group">
+                        <label for="amount">Amount (Rs)</label>
+                        <input type="number" id="amount" placeholder="0.00" step="0.01" min="0.01" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Transaction Type</label>
+                        <div class="type-selector">
+                            <div class="type-option give" onclick="selectType('give')">Party ko diya (Debit)</div>
+                            <div class="type-option receive active" onclick="selectType('receive')">Party ne diya (Credit)</div>
+                        </div>
+                        <input type="hidden" id="type" value="receive">
+                    </div>
+                    <div class="form-group">
+                        <label for="notes">Notes (optional)</label>
+                        <input type="text" id="notes" placeholder="Description...">
+                    </div>
+                    <div class="button-group">
+                        <button type="submit" class="btn-add">Add Transaction</button>
+                        <button type="button" class="btn-clear" onclick="clearForm()">Clear</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Right: Tables -->
+        <div class="tables-section">
+            <div class="table-tabs">
+                <button class="tab active" onclick="switchTab('all')">All Transactions</button>
+                <button class="tab" onclick="switchTab('party')">Party Summary</button>
+            </div>
+
+            <div id="allTab" class="tab-content active">
+                <div class="search-bar">
+                    <input type="text" id="searchEntry" placeholder="Search by party or notes..." onkeyup="filterTransactions()">
+                    <button class="btn-export" onclick="exportToCSV()">Export CSV</button>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Date</th>
+                            <th>Party</th>
+                            <th>Debit (Diya)</th>
+                            <th>Credit (Liya)</th>
+                            <th>Balance</th>
+                            <th>Notes</th>
+                            <th>Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="transactionTable"></tbody>
+                </table>
+            </div>
+
+            <div id="partyTab" class="tab-content">
+                <div class="search-bar">
+                    <input type="text" id="searchParty" placeholder="Search party..." onkeyup="renderPartySummary()">
+                </div>
+                <div id="partySummary"></div>
+            </div>
+        </div>
+    </div>
+</div>
+<script>
+
+    // Firebase Config (tumhara config)
+const firebaseConfig = {
+  apiKey: "AIzaSyC5Ynr5W3CczK1guxwESYaFr7wCmWvSpHY",
+  authDomain: "mehtabfactoryapp.firebaseapp.com",
+  projectId: "mehtabfactoryapp",
+  storageBucket: "mehtabfactoryapp.firebasestorage.app",
+  messagingSenderId: "4179937270",
+  appId: "1:4179937270:web:63332de20e08959b5de9d7",
+  measurementId: "G-REP7Y256R7"
+};
+
+// Initialize Firebase
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+// Real-time data from Firestore
+let partyData = [];
+let filteredData = [];
+
+db.collection("partyTransactions")
+  .orderBy("timestamp", "desc")
+  .onSnapshot((snapshot) => {
+    partyData = [];
+    snapshot.forEach((doc) => {
+      partyData.push({ id: doc.id, ...doc.data() });
+    });
+    filteredData = [...partyData];
+    renderTransactionTable();
+    renderPartySummary();
+    updateStats();
+  }, (error) => {
+    console.error("Firestore error:", error);
+    alert("Error loading party data from cloud.");
+  });
+
+// Format number with commas (Pakistan/English style)
+function formatNumber(num) {
+    return num.toLocaleString('en-PK', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+// Select type
+function selectType(type) {
+    document.getElementById("type").value = type;
+    document.querySelectorAll('.type-option').forEach(opt => opt.classList.remove('active'));
+    document.querySelector(`.type-option.${type}`).classList.add('active');
+}
+
+// Clear form
+function clearForm() {
+    document.getElementById("partyName").value = "";
+    document.getElementById("amount").value = "";
+    document.getElementById("notes").value = "";
+    document.getElementById("date").valueAsDate = new Date();
+    selectType('receive');
+}
+
+// Add transaction
+document.getElementById("partyForm").addEventListener("submit", e => {
+    e.preventDefault();
+
+    const date    = document.getElementById("date").value;
+    const party   = document.getElementById("partyName").value.trim();
+    const amount  = parseFloat(document.getElementById("amount").value);
+    const type    = document.getElementById("type").value;
+    const notes   = document.getElementById("notes").value.trim();
+
+    if (!date || !party || isNaN(amount) || amount <= 0) {
+        alert("Please fill all required fields with valid positive amount.");
+        return;
+    }
+
+    let obj = {
+        date,
+        partyName: party,
+        amount,
+        type,
+        notes,
+        timestamp: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
+    db.collection("partyTransactions").add(obj)
+        .then(() => {
+            clearForm();
+            alert("Transaction saved to cloud!");
+            // onSnapshot auto update karega table aur stats
+        })
+        .catch((error) => {
+            alert("Error saving: " + error.message);
+            console.error(error);
+        });
+});
+
+// Delete
+function deleteEntry(id) {
+    if (!confirm("Delete this transaction permanently?")) return;
+
+    db.collection("partyTransactions").doc(id).delete()
+        .then(() => {
+            // onSnapshot auto refresh karega
+        })
+        .catch((error) => {
+            alert("Delete error: " + error.message);
+        });
+}
+
+// Clear all (optional)
+function clearAllData() {
+    if (!confirm("Delete ALL transactions from cloud?")) return;
+
+    db.collection("partyTransactions").get().then((querySnapshot) => {
+        let batch = db.batch();
+        querySnapshot.forEach((doc) => {
+            batch.delete(doc.ref);
+        });
+        batch.commit()
+            .then(() => alert("All cloud data cleared!"))
+            .catch((error) => alert("Clear error: " + error.message));
+    });
+}
+
+// Render All Transactions with running balance
+function renderTransactionTable() {
+    const tbody = document.getElementById("transactionTable");
+    tbody.innerHTML = "";
+
+    if (filteredData.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="empty-state"><h3>No transactions yet</h3><p>Add entries above</p></td></tr>`;
+        return;
+    }
+
+    // Sort descending by date (latest first)
+    const sorted = [...filteredData].sort((a,b) => new Date(b.date) - new Date(a.date));
+
+    let running = 0;
+
+    sorted.forEach((item, idx) => {
+        const change = item.type === "give" ? -item.amount : +item.amount;
+        running += change;
+
+        const balanceClass = running > 0 ? 'balance-pos' : running < 0 ? 'balance-neg' : 'balance-zero';
+        const balanceText = running === 0 ? '0.00' : formatNumber(Math.abs(running));
+
+        tbody.innerHTML += `
+            <tr>
+                <td>${idx + 1}</td>
+                <td>${item.date}</td>
+                <td><strong>${item.partyName}</strong></td>
+                <td class="amount-give">${item.type === "give" ? "Rs " + formatNumber(item.amount) : "-"}</td>
+                <td class="amount-receive">${item.type === "receive" ? "Rs " + formatNumber(item.amount) : "-"}</td>
+                <td class="${balanceClass}">Rs ${balanceText}</td>
+                <td>${item.notes || "-"}</td>
+                <td><button class="btn-delete" onclick="deleteEntry('${item.id}')">Delete</button></td>
+            </tr>`;
+    });
+}
+
+// Render Party Summary
+function renderPartySummary() {
+    const container = document.getElementById("partySummary");
+    container.innerHTML = "";
+
+    const search = document.getElementById("searchParty").value.toLowerCase().trim();
+
+    const summary = {};
+    partyData.forEach(item => {
+        if (!summary[item.partyName]) summary[item.partyName] = { given:0, received:0, count:0 };
+        if (item.type === "give") summary[item.partyName].given += item.amount;
+        else summary[item.partyName].received += item.amount;
+        summary[item.partyName].count++;
+    });
+
+    const parties = Object.keys(summary).filter(p => p.toLowerCase().includes(search));
+
+    if (parties.length === 0) {
+        container.innerHTML = `<div class="empty-state"><h3>No matching parties</h3></div>`;
+        return;
+    }
+
+    parties.sort().forEach(party => {
+        const data = summary[party];
+        const bal = data.given - data.received;
+        const cls = bal > 0 ? 'positive' : bal < 0 ? 'negative' : 'neutral';
+        const txt = bal > 0 ? `You will receive Rs ${formatNumber(bal)}` :
+                    bal < 0 ? `You need to pay Rs ${formatNumber(Math.abs(bal))}` : 'Settled';
+
+        container.innerHTML += `
+            <div class="party-summary-card">
+                <div>
+                    <h4>${party}</h4>
+                    <small>${data.count} transactions | Given: Rs ${formatNumber(data.given)} | Received: Rs ${formatNumber(data.received)}</small>
+                </div>
+                <div class="${cls}" style="font-size:1.25em; font-weight:bold;">${txt}</div>
+            </div>`;
+    });
+}
+
+// Update stats & autocomplete
+function updateStats() {
+    let given = 0, received = 0;
+    partyData.forEach(t => {
+        if (t.type === "give") given += t.amount;
+        else received += t.amount;
+    });
+
+    const net = given - received;
+    const netEl = document.getElementById("netBalance");
+    netEl.textContent = `Rs ${formatNumber(Math.abs(net))}`;
+    netEl.className = `value ${net > 0 ? 'positive' : net < 0 ? 'negative' : 'neutral'}`;
+    document.getElementById("balanceStatus").textContent = net > 0 ? "You will receive" : net < 0 ? "You need to pay" : "All settled";
+
+    document.getElementById("totalReceivable").textContent = `Rs ${formatNumber(given)}`;
+    document.getElementById("totalPayable").textContent   = `Rs ${formatNumber(received)}`;
+
+    const unique = [...new Set(partyData.map(t => t.partyName))];
+    document.getElementById("totalParties").textContent = unique.length;
+
+    // Autocomplete list
+    const datalist = document.getElementById("partyList");
+    datalist.innerHTML = "";
+    unique.sort().forEach(p => datalist.innerHTML += `<option value="${p}">`);
+}
+
+// Filters
+function filterTransactions() {
+    const term = document.getElementById("searchEntry").value.toLowerCase().trim();
+    filteredData = partyData.filter(t =>
+        t.partyName.toLowerCase().includes(term) ||
+        (t.notes && t.notes.toLowerCase().includes(term))
+    );
+    renderTransactionTable();
+}
+
+function switchTab(tab) {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    event.target.classList.add('active');
+
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.getElementById(tab + 'Tab').classList.add('active');
+
+    if (tab === 'party') renderPartySummary();
+}
+
+// Export (still using local data, but since real-time hai, latest data hi lega)
+function exportToCSV() {
+    if (partyData.length === 0) return alert("No data to export.");
+
+    let csv = "Date,Party,Type,Amount,Notes\n";
+    partyData.forEach(t => {
+        csv += `${t.date},${t.partyName},${t.type === "give" ? "Debit" : "Credit"},${t.amount},"${t.notes?.replace(/"/g,'""') || ""}"\n`;
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `party_ledger_${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// Init
+document.getElementById("date").valueAsDate = new Date();
+updateAll();
+
+function updateAll() {
+    renderTransactionTable();
+    updateStats();
+    renderPartySummary();
+}
+</script>
+</body>
+</html>
